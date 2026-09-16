@@ -45,6 +45,9 @@ Examples:
 				return fmt.Errorf("invalid --end-date: %w", err)
 			}
 			endTime = parsed
+			if endTime.Before(time.Now()) {
+				return fmt.Errorf("--end-date is in the past (%s); use --now to retire immediately", endTime.Format("2006-01-02"))
+			}
 		}
 
 		claim, err := apiClient.SetLifespanEnd(namespace, name, endTime)
