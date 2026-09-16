@@ -158,16 +158,18 @@ func (c *Client) StopResourceClaim(namespace, name string) (*types.ResourceClaim
 	return c.PatchResourceClaim(namespace, name, patch)
 }
 
-// RetireResourceClaim retires a resource claim by setting lifespan end to now.
-// Mirrors the UI's setLifespanEndForResourceClaim: sends the full spec with updated lifespan.end.
-func (c *Client) RetireResourceClaim(namespace, name string) (*types.ResourceClaim, error) {
-	// GET the current resource first (same as the UI does)
+// SetLifespanEnd sets the lifespan end for a resource claim.
+// When endTime is zero, it defaults to now (retire). A future date extends the lifespan.
+func (c *Client) SetLifespanEnd(namespace, name string, endTime time.Time) (*types.ResourceClaim, error) {
 	claim, err := c.GetResourceClaim(namespace, name)
 	if err != nil {
 		return nil, err
 	}
 
-	endTimestamp := formatTime(time.Now().UTC())
+	if endTime.IsZero() {
+		endTime = time.Now().UTC()
+	}
+	endTimestamp := formatTime(endTime)
 
 	// Build patch with the full spec, updating lifespan.end
 	specMap := structToMap(claim.Spec)
