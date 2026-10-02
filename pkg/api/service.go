@@ -109,23 +109,26 @@ func (c *Client) DeleteResourceClaim(namespace, name string) error {
 }
 
 // StartResourceClaim starts a stopped resource claim.
-func (c *Client) StartResourceClaim(namespace, name string) (*types.ResourceClaim, error) {
-	// First get the current state to read runtime_default
+// If runtimeOverride is non-zero, it overrides the service's default runtime duration.
+func (c *Client) StartResourceClaim(namespace, name string, runtimeOverride time.Duration) (*types.ResourceClaim, error) {
 	claim, err := c.GetResourceClaim(namespace, name)
 	if err != nil {
 		return nil, err
 	}
 
-	runtimeDefault := 4 * time.Hour // default 4h
-	if claim.Status != nil && claim.Status.Summary != nil && claim.Status.Summary.RuntimeDefault != "" {
-		if d, err := parseDuration(claim.Status.Summary.RuntimeDefault); err == nil {
-			runtimeDefault = d
+	runtime := runtimeOverride
+	if runtime == 0 {
+		runtime = 4 * time.Hour // default 4h
+		if claim.Status != nil && claim.Status.Summary != nil && claim.Status.Summary.RuntimeDefault != "" {
+			if d, err := parseDuration(claim.Status.Summary.RuntimeDefault); err == nil {
+				runtime = d
+			}
 		}
 	}
 
 	now := time.Now().UTC()
 	startTimestamp := formatTime(now)
-	stopTimestamp := formatTime(now.Add(runtimeDefault))
+	stopTimestamp := formatTime(now.Add(runtime))
 
 	patch := map[string]interface{}{
 		"spec": map[string]interface{}{
@@ -142,8 +145,12 @@ func (c *Client) StartResourceClaim(namespace, name string) (*types.ResourceClai
 }
 
 // StopResourceClaim stops a running resource claim.
-func (c *Client) StopResourceClaim(namespace, name string) (*types.ResourceClaim, error) {
-	stopTimestamp := formatTime(time.Now().UTC())
+// If stopAt is zero, it stops immediately; otherwise it schedules the stop for that time.
+func (c *Client) StopResourceClaim(namespace, name string, stopAt time.Time) (*types.ResourceClaim, error) {
+	if stopAt.IsZero() {
+		stopAt = time.Now().UTC()
+	}
+	stopTimestamp := formatTime(stopAt)
 
 	patch := map[string]interface{}{
 		"spec": map[string]interface{}{
